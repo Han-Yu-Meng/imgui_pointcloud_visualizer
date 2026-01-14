@@ -1,0 +1,8 @@
+name: "imgui_pointcloud_visualizer"
+version: "0.1.0"
+description: "Pointcloud visualization using ImGui and OpenGL"
+maintainers:
+  - name: "fins"
+    email: "fins@sjtu.edu.cn"
+licenses:
+  - "MIT"
