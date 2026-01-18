@@ -1,11 +1,43 @@
 #include <fins/node.hpp>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
+#include <geometry_msgs/msg/transform_stamped.hpp>
+#include <nav_msgs/msg/path.hpp>
 
 #include "global_viewer.hpp"
-#include "utils.hpp"
 
 using namespace viz;
+
+inline void intensity_to_rainbow(float value, float min_v, float max_v,
+                                 float &r, float &g, float &b) {
+  float h = (1.0f - (value - min_v) / (max_v - min_v)) * 240.0f;
+  if (h < 0)
+    h = 0;
+  if (h > 240)
+    h = 240;
+  float x = 1.0f - fabs(fmod(h / 60.0f, 2.0f) - 1.0f);
+  if (h < 60) {
+    r = 1;
+    g = x;
+    b = 0;
+  } else if (h < 120) {
+    r = x;
+    g = 1;
+    b = 0;
+  } else if (h < 180) {
+    r = 0;
+    g = 1;
+    b = x;
+  } else if (h < 240) {
+    r = 0;
+    g = x;
+    b = 1;
+  } else {
+    r = x;
+    g = 0;
+    b = 1;
+  }
+}
 
 class BaseImGuiVisualizer : public fins::Node {
 protected:
@@ -39,9 +71,9 @@ public:
   }
 
   void on_cloud(const fins::Msg<pcl::PointCloud<pcl::PointXYZ>::Ptr> &msg) {
-    if (!msg.data || !(*msg.data) || (*msg.data)->empty())
+    auto &cloud = *msg;
+    if (!cloud || cloud->empty())
       return;
-    auto &cloud = *msg.data;
     std::vector<float> buffer;
     buffer.reserve(cloud->size() * 6);
     for (const auto &p : *cloud) {
@@ -67,9 +99,9 @@ public:
   }
 
   void on_cloud(const fins::Msg<pcl::PointCloud<pcl::PointXYZI>::Ptr> &msg) {
-    if (!msg.data || !(*msg.data) || (*msg.data)->empty())
+    auto &cloud = *msg;
+    if (!cloud || cloud->empty())
       return;
-    auto &cloud = *msg.data;
     std::vector<float> buffer;
     buffer.reserve(cloud->size() * 6);
 
@@ -109,9 +141,9 @@ public:
   }
 
   void on_cloud(const fins::Msg<pcl::PointCloud<pcl::PointXYZRGB>::Ptr> &msg) {
-    if (!msg.data || !(*msg.data) || (*msg.data)->empty())
+    auto &cloud = *msg;
+    if (!cloud || cloud->empty())
       return;
-    auto &cloud = *msg.data;
     std::vector<float> buffer;
     buffer.reserve(cloud->size() * 6);
     for (const auto &p : *cloud) {
@@ -126,8 +158,139 @@ public:
   }
 };
 
-// 导出节点
+// Transform Visualizer - Shows coordinate frames like RViz2
+class ImGuiTransformVisualizer : public fins::Node {
+private:
+  std::string title_;
+  std::string fixed_frame_;
+
+public:
+  void define() override {
+    set_name("ImGuiTransformVisualizer");
+    set_description("Visualizes TransformStamped as coordinate axes (like RViz2)");
+    
+    register_parameter<std::string>("title", 
+                                    &ImGuiTransformVisualizer::update_title,
+                                    "Transform");
+    register_parameter<std::string>("fixed_frame",
+                                    &ImGuiTransformVisualizer::update_fixed_frame,
+                                    "camera_init");
+    
+    register_input<0, geometry_msgs::msg::TransformStamped>(
+        "transform", &ImGuiTransformVisualizer::on_transform);
+  }
+
+  void update_title(const std::string &new_title) { title_ = new_title; }
+  void update_fixed_frame(const std::string &frame) { fixed_frame_ = frame; }
+
+  void initialize() override {}
+
+  void run() override { GlobalViewer::get().register_active_node(); }
+  void pause() override { GlobalViewer::get().unregister_active_node(); }
+
+  void reset() override {
+    // Clear transform visualization
+    Eigen::Matrix4f identity = Eigen::Matrix4f::Identity();
+    GlobalViewer::get().update_transform(title_, identity, "", "");
+  }
+
+  void on_transform(const fins::Msg<geometry_msgs::msg::TransformStamped> &msg) {
+    if (!msg)
+      return;
+
+    auto &tf = *msg;
+    
+    // Convert ROS transform to Eigen Matrix4f
+    Eigen::Matrix4f transform = Eigen::Matrix4f::Identity();
+    
+    // Translation
+    transform(0, 3) = tf.transform.translation.x;
+    transform(1, 3) = tf.transform.translation.y;
+    transform(2, 3) = tf.transform.translation.z;
+    
+    // Rotation (quaternion to matrix)
+    Eigen::Quaternionf q(
+      tf.transform.rotation.w,
+      tf.transform.rotation.x,
+      tf.transform.rotation.y,
+      tf.transform.rotation.z
+    );
+    Eigen::Matrix3f rot = q.toRotationMatrix();
+    transform.block<3, 3>(0, 0) = rot;
+    
+    GlobalViewer::get().update_transform(
+      title_, 
+      transform,
+      tf.child_frame_id,
+      tf.header.frame_id
+    );
+  }
+};
+
+// Path Visualizer - Shows trajectory paths
+class ImGuiPathVisualizer : public fins::Node {
+private:
+  std::string title_;
+  size_t max_points_;
+
+public:
+  void define() override {
+    set_name("ImGuiPathVisualizer");
+    set_description("Visualizes nav_msgs::Path as a line trajectory");
+    
+    register_parameter<std::string>("title", 
+                                    &ImGuiPathVisualizer::update_title,
+                                    "Path");
+    register_parameter<size_t>("max_points",
+                              &ImGuiPathVisualizer::update_max_points,
+                              1000);
+    
+    register_input<0, nav_msgs::msg::Path>(
+        "path", &ImGuiPathVisualizer::on_path);
+  }
+
+  void update_title(const std::string &new_title) { title_ = new_title; }
+  void update_max_points(size_t max_pts) { max_points_ = max_pts; }
+
+  void initialize() override {
+    max_points_ = 1000;
+  }
+
+  void run() override { GlobalViewer::get().register_active_node(); }
+  void pause() override { GlobalViewer::get().unregister_active_node(); }
+
+  void reset() override {
+    std::vector<Eigen::Vector3f> empty;
+    GlobalViewer::get().update_path(title_, empty);
+  }
+
+  void on_path(const fins::Msg<nav_msgs::msg::Path> &msg) {
+    auto &path = *msg;
+    if (path.poses.empty())
+      return;
+
+    std::vector<Eigen::Vector3f> points;
+    points.reserve(std::min(path.poses.size(), max_points_));
+    
+    // Downsample if necessary
+    size_t step = 1;
+    if (path.poses.size() > max_points_) {
+      step = path.poses.size() / max_points_;
+    }
+    
+    for (size_t i = 0; i < path.poses.size(); i += step) {
+      const auto &pose = path.poses[i].pose.position;
+      points.emplace_back(pose.x, pose.y, pose.z);
+    }
+    
+    GlobalViewer::get().update_path(title_, points);
+  }
+};
+
+// Export nodes
 EXPORT_NODE(ImGuiCloudXYZVisualizer)
 EXPORT_NODE(ImGuiCloudXYZIVisualizer)
 EXPORT_NODE(ImGuiCloudRGBVisualizer)
+EXPORT_NODE(ImGuiTransformVisualizer)
+EXPORT_NODE(ImGuiPathVisualizer)
 DEFINE_PLUGIN_ENTRY()

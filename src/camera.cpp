@@ -3,24 +3,24 @@
 
 namespace viz {
 
-
 // ==========================================
 // 2. Camera Implementation
 // ==========================================
 
 void Camera::update() {
-    // 限制俯仰角，防止万向节死锁，同时保持俯视感
-    if (pitch > 89.0f) pitch = 89.0f;
-    if (pitch < -89.0f) pitch = -89.0f;
+  if (pitch > 89.0f)
+    pitch = 89.0f;
+  if (pitch < -89.0f)
+    pitch = -89.0f;
 
-    float radYaw = yaw * M_PI / 180.0f;
-    float radPitch = pitch * M_PI / 180.0f;
+  float radYaw = yaw * M_PI / 180.0f;
+  float radPitch = pitch * M_PI / 180.0f;
 
-    float x = distance * cos(radPitch) * cos(radYaw);
-    float y = distance * cos(radPitch) * sin(radYaw);
-    float z = distance * sin(radPitch);
+  float x = distance * cos(radPitch) * cos(radYaw);
+  float y = distance * cos(radPitch) * sin(radYaw);
+  float z = distance * sin(radPitch);
 
-    position = pivot + Eigen::Vector3f(x, y, z);
+  position = pivot + Eigen::Vector3f(x, y, z);
 }
 
 Eigen::Matrix4f Camera::getViewMatrix() {
