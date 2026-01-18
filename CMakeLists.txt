@@ -6,10 +6,6 @@ find_package(OpenGL REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(Eigen3 REQUIRED)
 
-find_package(rclcpp REQUIRED)
-find_package(nav_msgs QUIET)
-find_package(geometry_msgs QUIET)
-
 set(IMGUI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/imgui)
 set(IMGUI_SOURCES
     ${IMGUI_DIR}/imgui.cpp
@@ -21,7 +17,7 @@ set(IMGUI_SOURCES
     ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
 )
 
-add_library(${PROJECT_NAME} SHARED
+fins_add_node(${PROJECT_NAME}
     src/camera.cpp
     src/nodes.cpp
     ${IMGUI_SOURCES}
@@ -36,26 +32,16 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
-    fins_sdk
     ${PCL_LIBRARIES}
     glfw
     OpenGL::GL
-    rclcpp::rclcpp
 )
 
-if(TARGET nav_msgs::nav_msgs)
-    target_link_libraries(${PROJECT_NAME} PRIVATE nav_msgs::nav_msgs)
-else()
-    target_include_directories(${PROJECT_NAME} PRIVATE ${nav_msgs_INCLUDE_DIRS})
-    target_link_libraries(${PROJECT_NAME} PRIVATE ${nav_msgs_LIBRARIES})
-endif()
-
-if(TARGET geometry_msgs::geometry_msgs)
-    target_link_libraries(${PROJECT_NAME} PRIVATE geometry_msgs::geometry_msgs)
-else()
-    target_include_directories(${PROJECT_NAME} PRIVATE ${geometry_msgs_INCLUDE_DIRS})
-    target_link_libraries(${PROJECT_NAME} PRIVATE ${geometry_msgs_LIBRARIES})
-endif()
+fins_link_ros_dependencies(${PROJECT_NAME}
+    rclcpp
+    nav_msgs
+    geometry_msgs
+)
 
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
 target_compile_definitions(${PROJECT_NAME} PRIVATE GL_GLEXT_PROTOTYPES)
