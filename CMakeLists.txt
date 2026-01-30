@@ -38,7 +38,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 )
 
 fins_link_ros_dependencies(${PROJECT_NAME}
-    rclcpp
     nav_msgs
     geometry_msgs
 )

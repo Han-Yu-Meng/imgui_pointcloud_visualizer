@@ -4,5 +4,15 @@ description: "Pointcloud visualization using ImGui and OpenGL"
 maintainers:
   - name: "fins"
     email: "fins@sjtu.edu.cn"
+depends:
+  Eigen3: "3.4.0"
+  OpenMP: "system"
+  
+  geometry_msgs: "system"
+  nav_msgs: "system"
+
+  PCL: "system"
+  OpenGL: "system"
+  glfw3: "system"
 licenses:
   - "MIT"

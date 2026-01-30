@@ -66,14 +66,17 @@ public:
     BaseImGuiVisualizer::define();
     set_name("ImGuiCloudXYZVisualizer");
     set_description("Visualizes XYZ PointCloud (Black/Grey)");
-    register_input<0, pcl::PointCloud<pcl::PointXYZ>::Ptr>(
+    set_category("Visualization");
+    register_input<pcl::PointCloud<pcl::PointXYZ>::Ptr>(
         "cloud", &ImGuiCloudXYZVisualizer::on_cloud);
   }
 
   void on_cloud(const fins::Msg<pcl::PointCloud<pcl::PointXYZ>::Ptr> &msg) {
     auto &cloud = *msg;
-    if (!cloud || cloud->empty())
+    if (!cloud || cloud->empty()){
+      logger->warn("Empty cloud received in ImGuiCloudXYZVisualizer");
       return;
+    }
     std::vector<float> buffer;
     buffer.reserve(cloud->size() * 6);
     for (const auto &p : *cloud) {
@@ -94,14 +97,18 @@ public:
     BaseImGuiVisualizer::define();
     set_name("ImGuiCloudXYZIVisualizer");
     set_description("Visualizes XYZI PointCloud (Rainbow Intensity)");
-    register_input<0, pcl::PointCloud<pcl::PointXYZI>::Ptr>(
+    set_category("Visualization");
+    register_input<pcl::PointCloud<pcl::PointXYZI>::Ptr>(
         "cloud", &ImGuiCloudXYZIVisualizer::on_cloud);
   }
 
   void on_cloud(const fins::Msg<pcl::PointCloud<pcl::PointXYZI>::Ptr> &msg) {
+    logger->debug("Received XYZI cloud message");
     auto &cloud = *msg;
-    if (!cloud || cloud->empty())
-      return;
+    if (!cloud || cloud->empty()) {
+      logger->warn("Empty cloud received in ImGuiCloudXYZIVisualizer");
+      return ;
+    }
     std::vector<float> buffer;
     buffer.reserve(cloud->size() * 6);
 
@@ -136,14 +143,18 @@ public:
     BaseImGuiVisualizer::define();
     set_name("ImGuiCloudRGBVisualizer");
     set_description("Visualizes XYZRGB PointCloud");
-    register_input<0, pcl::PointCloud<pcl::PointXYZRGB>::Ptr>(
+    set_category("Visualization");
+    register_input<pcl::PointCloud<pcl::PointXYZRGB>::Ptr>(
         "cloud", &ImGuiCloudRGBVisualizer::on_cloud);
   }
 
   void on_cloud(const fins::Msg<pcl::PointCloud<pcl::PointXYZRGB>::Ptr> &msg) {
+    logger->debug("Received XYZRGB cloud message");
     auto &cloud = *msg;
-    if (!cloud || cloud->empty())
-      return;
+    if (!cloud || cloud->empty()){
+      logger->warn("Empty cloud received in ImGuiCloudRGBVisualizer");
+      return ;
+    }
     std::vector<float> buffer;
     buffer.reserve(cloud->size() * 6);
     for (const auto &p : *cloud) {
@@ -168,6 +179,7 @@ public:
   void define() override {
     set_name("ImGuiTransformVisualizer");
     set_description("Visualizes TransformStamped as coordinate axes (like RViz2)");
+    set_category("Visualization");
     
     register_parameter<std::string>("title", 
                                     &ImGuiTransformVisualizer::update_title,
@@ -176,7 +188,7 @@ public:
                                     &ImGuiTransformVisualizer::update_fixed_frame,
                                     "camera_init");
     
-    register_input<0, geometry_msgs::msg::TransformStamped>(
+    register_input<geometry_msgs::msg::TransformStamped>(
         "transform", &ImGuiTransformVisualizer::on_transform);
   }
 
@@ -195,8 +207,11 @@ public:
   }
 
   void on_transform(const fins::Msg<geometry_msgs::msg::TransformStamped> &msg) {
-    if (!msg)
+    logger->debug("Received TransformStamped message");
+    if (!msg){
+      logger->warn("Null transform received in ImGuiTransformVisualizer");
       return;
+    }
 
     auto &tf = *msg;
     
@@ -237,6 +252,7 @@ public:
   void define() override {
     set_name("ImGuiPathVisualizer");
     set_description("Visualizes nav_msgs::Path as a line trajectory");
+    set_category("Visualization");
     
     register_parameter<std::string>("title", 
                                     &ImGuiPathVisualizer::update_title,
@@ -245,7 +261,7 @@ public:
                               &ImGuiPathVisualizer::update_max_points,
                               1000);
     
-    register_input<0, nav_msgs::msg::Path>(
+    register_input<nav_msgs::msg::Path>(
         "path", &ImGuiPathVisualizer::on_path);
   }
 
@@ -266,8 +282,10 @@ public:
 
   void on_path(const fins::Msg<nav_msgs::msg::Path> &msg) {
     auto &path = *msg;
-    if (path.poses.empty())
-      return;
+    if (path.poses.empty()){
+      logger->warn("Empty path received in ImGuiPathVisualizer");
+      return ;
+    }
 
     std::vector<Eigen::Vector3f> points;
     points.reserve(std::min(path.poses.size(), max_points_));
